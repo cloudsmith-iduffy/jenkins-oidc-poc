@@ -1,0 +1,54 @@
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      - JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+      - CLOUDSMITH_ORG=iduffy-demo
+      - CLOUDSMITH_SERVICE_ACCOUNT_SLUG=jenkins-dvha
+      - CLOUDSMITH_REPO=upstreams
+    volumes:
+      - public-http-server:/public-http-server
+      - jenkins_home:/var/jenkins_home
+      - ./jenkins-config/init.groovy.d:/var/jenkins_home/init.groovy.d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/jenkins/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    entrypoint: |
+      sh -c '
+      # Wait for ngrok URL to be available
+      while ! curl -s ngrok:4040/api/tunnels | grep -q "https://"; do
+        sleep 1
+      done
+      # Get the ngrok URL and export it
+      export NGROK_URL=$(curl -s ngrok:4040/api/tunnels | grep -o "https://[^\"]*")
+      apt-get update
+      apt-get install -y jq python3 python3-pip python3.11-venv
+      # Start Jenkins
+      /usr/local/bin/jenkins.sh'
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTH}
+    command:
+      - "http"
+      - "nginx:80"  # Points to the Jenkins service name
+    ports:
+      - "4040:4040"  # Ngrok web interface
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - public-http-server:/usr/share/nginx/html:ro
+
+volumes:
+  jenkins_home:
+  public-http-server:
