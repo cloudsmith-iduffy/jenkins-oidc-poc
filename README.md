@@ -21,7 +21,7 @@ export NGROK_AUTH=your_ngrok_token
 
 3. Start the services:
 ```bash
-docker-compose up -d
+docker-compose up
 ```
 
 4. Find the provider URL in the Jenkins logs:
